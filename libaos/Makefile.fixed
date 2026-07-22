@@ -1,0 +1,15 @@
+CFLAGS = -I/usr/include/openssl1.1
+LDFLAGS = -L/usr/lib/x86_64-linux-gnu -Wl,--no-as-needed -lssl1.1 -lcrypto1.1
+
+OBJECTS=aos.o block.o crypto.o md5.o flash.o
+
+all: libaos.a
+
+.c.o:
+	gcc $(CFLAGS) -c $*.c
+
+libaos.a: $(OBJECTS)
+	ar crs libaos.a $(OBJECTS)
+
+clean:
+	rm -f libaos.a *.o
