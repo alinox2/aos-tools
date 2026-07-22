@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  builder:
+    build: .
+    image: aos-tools:latest
+    container_name: aos-tools-builder
+    volumes:
+      - .:/src
+      - ./build/docker:/output
+    working_dir: /src
+    command: /bin/bash
+    stdin_open: true
+    tty: true
+
+  # Run compiled binary
+  aos-info:
+    image: aos-tools:latest
+    container_name: aos-info
+    volumes:
+      - ./firmware:/data
+    command: /output/aos-info /data/firmware.aos
+
+  # Build and test in one step
+  test:
+    build: .
+    image: aos-tools:latest
+    container_name: aos-tools-test
+    volumes:
+      - .:/src
+      - ./test-firmware:/data
+    command: |
+      bash -c "
+        cd /src/libaos && make && cd ..
+        cd /src/tools && make && cd ..
+        ./tools/aos-info --help
+      "
