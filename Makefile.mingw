@@ -1,0 +1,101 @@
+# Makefile for MinGW Cross-Compilation (Linux -> Windows)
+# Usage: make -f Makefile.mingw CC=x86_64-w64-mingw32-gcc
+
+CC ?= x86_64-w64-mingw32-gcc
+AR ?= x86_64-w64-mingw32-ar
+CFLAGS = -Wall -O2 -m64
+LDFLAGS = -static -lssl -lcrypto -lws2_32
+
+# OpenSSL paths for cross-compilation
+OPENSSL_INCLUDE ?= /usr/x86_64-w64-mingw32/include
+OPENSSL_LIB ?= /usr/x86_64-w64-mingw32/lib
+
+CFLAGS += -I$(OPENSSL_INCLUDE)
+LDFLAGS += -L$(OPENSSL_LIB)
+
+BUILD_DIR = build/windows
+RELEASE_DIR = $(BUILD_DIR)/release
+
+all: $(RELEASE_DIR)/libaos.a \
+     $(RELEASE_DIR)/aos-info.exe \
+     $(RELEASE_DIR)/aos-unpack.exe \
+     $(RELEASE_DIR)/aos-fix.exe \
+     $(RELEASE_DIR)/aos-repack.exe
+
+# Create directories
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR) $(RELEASE_DIR)
+
+# libaos library
+LIBAOS_OBJS = $(BUILD_DIR)/aos.o $(BUILD_DIR)/block.o $(BUILD_DIR)/crypto.o \
+              $(BUILD_DIR)/md5.o $(BUILD_DIR)/flash.o
+
+$(BUILD_DIR)/%.o: libaos/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(RELEASE_DIR)/libaos.a: $(LIBAOS_OBJS)
+	$(AR) rcs $@ $^
+	@echo "✓ Built: $@"
+
+# Common objects for tools
+TOOLS_OBJS = $(BUILD_DIR)/files.o $(BUILD_DIR)/mpk.o
+
+$(BUILD_DIR)/%.o: tools/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -I./libaos -c $< -o $@
+
+# AOS tools
+$(RELEASE_DIR)/aos-info.exe: $(BUILD_DIR)/aos-info.o $(TOOLS_OBJS) $(RELEASE_DIR)/libaos.a
+	$(CC) -o $@ $^ $(LDFLAGS) -L$(RELEASE_DIR) -laos
+	@echo "✓ Built: $@"
+
+$(BUILD_DIR)/aos-info.o: tools/aos-info.c
+	$(CC) $(CFLAGS) -I./libaos -c $< -o $@
+
+$(RELEASE_DIR)/aos-unpack.exe: $(BUILD_DIR)/aos-unpack.o $(TOOLS_OBJS) $(RELEASE_DIR)/libaos.a
+	$(CC) -o $@ $^ $(LDFLAGS) -L$(RELEASE_DIR) -laos
+	@echo "✓ Built: $@"
+
+$(BUILD_DIR)/aos-unpack.o: tools/aos-unpack.c
+	$(CC) $(CFLAGS) -I./libaos -c $< -o $@
+
+$(RELEASE_DIR)/aos-fix.exe: $(BUILD_DIR)/aos-fix.o $(TOOLS_OBJS) $(RELEASE_DIR)/libaos.a
+	$(CC) -o $@ $^ $(LDFLAGS) -L$(RELEASE_DIR) -laos
+	@echo "✓ Built: $@"
+
+$(BUILD_DIR)/aos-fix.o: tools/aos-fix.c
+	$(CC) $(CFLAGS) -I./libaos -c $< -o $@
+
+$(RELEASE_DIR)/aos-repack.exe: $(BUILD_DIR)/aos-repack.o $(TOOLS_OBJS) $(RELEASE_DIR)/libaos.a
+	$(CC) -o $@ $^ $(LDFLAGS) -L$(RELEASE_DIR) -laos
+	@echo "✓ Built: $@"
+
+$(BUILD_DIR)/aos-repack.o: tools/aos-repack.c
+	$(CC) $(CFLAGS) -I./libaos -c $< -o $@
+
+# Phony targets
+.PHONY: clean info help
+
+clean:
+	rm -rf $(BUILD_DIR)
+	@echo "✓ Cleaned build directory"
+
+info:
+	@echo "AOS-Tools MinGW Cross-Compilation"
+	@echo "=================================="
+	@echo "Compiler: $(CC)"
+	@echo "OpenSSL: $(OPENSSL_INCLUDE)"
+	@echo "Build directory: $(BUILD_DIR)"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make -f Makefile.mingw                        # Default build (64-bit)"
+	@echo "  make -f Makefile.mingw CC=i686-w64-mingw32-gcc # Build 32-bit"
+	@echo "  make -f Makefile.mingw clean                  # Clean"
+	@echo ""
+
+help: info
+
+.PHONY: test
+test: all
+	@echo ""
+	@echo "✓ Build complete. Binaries in: $(RELEASE_DIR)/"
+	@ls -lh $(RELEASE_DIR)/
